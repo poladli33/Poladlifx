@@ -1,2 +1,0 @@
-# Runtime uses Python standard library only.
-# Tests also use unittest from the standard library.

@@ -1,58 +1,72 @@
-# PoladliFX — FinancialJuice → Telegram Alerts
+# PoladliFX — FinancialJuice → Telegram Economic Alerts
 
-Autonomous GitHub Actions bot for monitoring the public FinancialJuice RSS feed and sending selected high-impact / market-moving headlines to Telegram.
+This project is an autonomous Telegram alert bot designed for GitHub Actions.
 
-## What it does
+## What is implemented
 
-- Polls the public FinancialJuice RSS feed.
-- Filters for high-impact and market-moving terms.
-- Deduplicates alerts using SQLite.
-- Sends HTML-formatted Telegram messages.
-- Runs from GitHub Actions, so ChatGPT is **not required at runtime**.
+- FinancialJuice **public RSS** is used for headlines only. No closed endpoint scraping, anti-bot bypass, or hidden API extraction is used.
+- Economic-calendar data is obtained through a separate calendar-provider adapter. The included adapter targets **Trading Economics REST API** and expects a licensed `TRADING_ECONOMICS_API_KEY`.
+- Events are normalized into: `event_id`, `timestamp_utc`, `country`, `currency`, `event_name`, `impact`, `actual`, `forecast`, `previous`, `revised_previous`, `source`, and status/state fields.
+- Impact is normalized as `EXTREME`, `HIGH`, `MEDIUM`, `LOW`. Provider importance (1/2/3) is respected, but critical event names such as FOMC/CPI/PCE/NFP/Powell can be promoted to `EXTREME`.
+- Currency-to-instrument mapping covers `XAUUSD`, `DXY`, `EURUSD`, `GBPUSD`, `USDJPY`, and `USDCAD`.
+- Calendar notifications support T−30, T−15, T−5 and T+0/Actual, with per-event deduplication.
+- Actual vs Forecast classification supports direction-aware labels such as `MUCH BETTER`, `IN LINE`, and `MUCH WORSE`; metrics without a meaningful universal direction use `ABOVE FORECAST` / `BELOW FORECAST` instead of pretending that the result is intrinsically better or worse.
+- Persistent state is stored in `data/state.json` and committed back to the repository only when it changes. GitHub Actions therefore does not depend on the runner filesystem surviving between jobs.
+- Unit tests use only the Python standard library.
 
-The feed endpoint used by this project is the publicly referenced FinancialJuice RSS endpoint:
-`https://www.financialjuice.com/feed.ashx?xy=rss`
+## Important provider note
 
-## GitHub Secrets
+FinancialJuice Terms prohibit automated collection, aggregation, copying, or extraction of the Service/content unless expressly permitted in writing. This project therefore keeps FinancialJuice usage to its public RSS feed and does not attempt to reverse-engineer closed endpoints.
 
-In the repository:
+For the calendar, do not assume that an old `guest:guest` Trading Economics example is a production/free entitlement. The current Trading Economics documentation requires an API key/plan for REST access. Configure `TRADING_ECONOMICS_API_KEY` as a GitHub Actions secret.
 
-**Settings → Secrets and variables → Actions**
+## GitHub setup
 
-Create:
+Repository **Settings → Secrets and variables → Actions**:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
+- `TRADING_ECONOMICS_API_KEY`
 
-Do not commit either credential to the repository.
-
-## Telegram setup
-
-1. Open Telegram and talk to `@BotFather`.
-2. Create a bot with `/newbot`.
-3. Copy the bot token into `TELEGRAM_BOT_TOKEN`.
-4. Add the bot to the target chat/channel and give it permission to post.
-5. Put the target chat ID into `TELEGRAM_CHAT_ID`.
+The workflow requests `contents: write` because it persists `data/state.json` back to the repository. GitHub's checkout action keeps credentials available for authenticated `git push` in later workflow steps.
 
 ## Run
 
-Open:
+The workflow is scheduled for `*/5 * * * *`. GitHub schedules are best-effort and can be delayed, so pre-event windows are intentionally tolerant of a few minutes of drift.
 
-**Actions → FinancialJuice Telegram Alerts → Run workflow**
+Manual run: **Actions → PoladliFX FinancialJuice Alerts → Run workflow**.
 
-The scheduled workflow is configured to poll approximately every 5 minutes. GitHub Actions schedules are best-effort and can be delayed.
+## Structure
 
-## Filtering
+```text
+financialjuice_bot/
+├── alerts.py
+├── calendar.py
+├── config.py
+├── filters.py
+├── instruments.py
+├── main.py
+├── models.py
+├── news.py
+├── storage.py
+└── telegram.py
 
-The keyword filter is intentionally broad. Edit `HIGH_IMPACT` in `financialjuice_bot/main.py` to make alerts stricter for your ICT/XAUUSD workflow.
+data/state.json
+tests/
+.github/workflows/financialjuice.yml
+.env.example
+requirements.txt
+README.md
+```
 
-Suggested next improvements:
+## Local dry run
 
-- separate XAUUSD / DXY / USD / indices filters
-- economic-calendar pre-event alerts
-- 30/15/5 minute reminders
-- actual/forecast/previous comparison
-- duplicate headline clustering
-- Telegram topics
-- severity levels A/B/C
-- quiet hours
+```bash
+export DRY_RUN=true
+export TELEGRAM_BOT_TOKEN=dummy
+export TELEGRAM_CHAT_ID=dummy
+python -m unittest discover -s tests -v
+python -m financialjuice_bot.main
+```
+
+Calendar requests still require a valid calendar API key when `ENABLE_CALENDAR=true`.

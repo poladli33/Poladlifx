@@ -1,0 +1,23 @@
+services:
+  financialjuice-bot:
+    build: .
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      STATE_DB: /app/data/financialjuice_state.sqlite3
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      FINANCIALJUICE_HOME_URL: https://www.financialjuice.com/home
+      FINANCIALJUICE_RSS_URL: https://www.financialjuice.com/feed.ashx?xy=rss
+      RUN_MODE: realtime
+      POLL_INTERVAL_SECONDS: 5
+      PAGE_REFRESH_SECONDS: 60
+      FRESH_MINUTES: 12
+      PRE_ALERT_MINUTES: 5
+      PRE_ALERT_WINDOW_SECONDS: 30
+      HOME_WAIT_SECONDS: 8
+      DAILY_DIGEST_HOUR: 9
+      DAILY_DIGEST_MINUTE: 0
+      DAILY_DIGEST_WINDOW_SECONDS: 90
+    volumes:
+      - ./data:/app/data

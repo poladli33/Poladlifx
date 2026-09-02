@@ -1,1 +1,0 @@
-"""PoladliFX FinancialJuice Telegram bot."""
